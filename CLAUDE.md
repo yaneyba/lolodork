@@ -105,3 +105,13 @@ Environment variables:
 | `openai-whisper` | Speech-to-text |
 | `fastmcp` + `mcp` | MCP protocol support |
 | `pydantic` | Data validation |
+
+## Syncing with Upstream
+
+This is a fork of `agent0ai/agent-zero`. To pull the latest changes from upstream:
+
+```bash
+git pull upstream main && git push
+```
+
+The `upstream` remote is already configured pointing to `https://github.com/agent0ai/agent-zero.git`.
