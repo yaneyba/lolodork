@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Zero — System Architecture</title>
+  <style>
+    :root {
+      --bg-1: #0a0e1a;
+      --bg-2: #101828;
+      --panel: #1a2340;
+      --panel-2: #1f2d50;
+      --accent: #6ee7ff;
+      --accent-2: #a78bfa;
+      --accent-3: #34d399;
+      --accent-4: #f472b6;
+      --accent-5: #fbbf24;
+      --text: #e8ecf5;
+      --muted: #8a9bc0;
+      --border: #2a3a5c;
+      --border-light: #3a4d75;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Inter", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 15% 10%, rgba(110,231,255,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 5%, rgba(167,139,250,0.05) 0%, transparent 40%),
+        radial-gradient(ellipse at 50% 90%, rgba(52,211,153,0.04) 0%, transparent 40%),
+        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    .header {
+      max-width: 1400px;
+      margin: 0 auto 28px auto;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    .header .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+      max-width: 800px;
+    }
+
+    .header .badges {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge.python { background: rgba(52,211,153,0.15); color: var(--accent-3); border: 1px solid rgba(52,211,153,0.25); }
+    .badge.flask { background: rgba(110,231,255,0.12); color: var(--accent); border: 1px solid rgba(110,231,255,0.2); }
+    .badge.llm { background: rgba(167,139,250,0.15); color: var(--accent-2); border: 1px solid rgba(167,139,250,0.25); }
+    .badge.docker { background: rgba(244,114,182,0.12); color: var(--accent-4); border: 1px solid rgba(244,114,182,0.2); }
+
+    /* ── Diagram Canvas ── */
+    .canvas {
+      position: relative;
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto 32px auto;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 40px),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 40px),
+        linear-gradient(145deg, rgba(26,35,64,0.5), rgba(16,24,40,0.8));
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    svg { width: 100%; height: 100%; display: block; }
+
+    /* ── Legend Grid ── */
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto 24px auto;
+    }
+
+    .card {
+      background: linear-gradient(145deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      transition: border-color 0.2s;
+    }
+
+    .card:hover { border-color: var(--border-light); }
+
+    .card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card h3 .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .card p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .card code {
+      background: rgba(110,231,255,0.08);
+      color: var(--accent);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+    }
+
+    .footer {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Agent Zero — System Architecture</h1>
+    <p class="subtitle">
+      A comprehensive architecture map of the Agent Zero framework — a general-purpose AI agent
+      that learns and grows through persistent memory, hierarchical delegation, and extensible tooling.
+    </p>
+    <div class="badges">
+      <span class="badge python">Python 3 + Flask</span>
+      <span class="badge llm">LiteLLM Multi-Provider</span>
+      <span class="badge flask">FAISS Vector Memory</span>
+      <span class="badge docker">Docker Runtime</span>
+    </div>
+  </div>
+
+  <div class="canvas">
+    <svg viewBox="0 0 1400 920" xmlns="http://www.w3.org/2000/svg" aria-label="Agent Zero system architecture diagram">
+      <defs>
+        <!-- Gradients -->
+        <linearGradient id="g-node" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1f2d50"/>
+          <stop offset="100%" stop-color="#18233e"/>
+        </linearGradient>
+        <linearGradient id="g-core" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e2f5a"/>
+          <stop offset="100%" stop-color="#162040"/>
+        </linearGradient>
+        <linearGradient id="g-highlight" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#6ee7ff" stop-opacity="0.08"/>
+          <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.06"/>
+        </linearGradient>
+        <linearGradient id="g-zone-ext" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#34d399" stop-opacity="0.04"/>
+          <stop offset="100%" stop-color="#34d399" stop-opacity="0.01"/>
+        </linearGradient>
+
+        <!-- Arrow markers -->
+        <marker id="arr-cyan" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L10,4 L0,8 z" fill="#6ee7ff" opacity="0.7"/>
+        </marker>
+        <marker id="arr-purple" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L10,4 L0,8 z" fill="#a78bfa" opacity="0.7"/>
+        </marker>
+        <marker id="arr-green" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L10,4 L0,8 z" fill="#34d399" opacity="0.7"/>
+        </marker>
+        <marker id="arr-pink" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L10,4 L0,8 z" fill="#f472b6" opacity="0.7"/>
+        </marker>
+
+        <!-- Glow filter -->
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 0 — Docker Runtime Boundary          -->
+      <!-- ═══════════════════════════════════════════ -->
+      <rect x="40" y="75" width="1320" height="820" rx="18"
+            fill="url(#g-highlight)" stroke="#2a3a5c" stroke-dasharray="8 6" stroke-opacity="0.6"/>
+      <text x="62" y="100" fill="#6b7fa6" font-size="12" font-weight="600" letter-spacing="1" text-transform="uppercase">
+        RUNTIME BOUNDARY (Docker / Bare-Metal)
+      </text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 1 — User & Interface                 -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <!-- User -->
+      <rect x="560" y="10" width="280" height="52" rx="12" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="700" y="42" fill="#e8ecf5" font-size="16" text-anchor="middle" font-weight="700">User / Owner</text>
+
+      <!-- Web UI -->
+      <rect x="180" y="110" width="240" height="72" rx="12" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="300" y="140" fill="#6ee7ff" font-size="14" text-anchor="middle" font-weight="700">Web UI</text>
+      <text x="300" y="160" fill="#8a9bc0" font-size="11" text-anchor="middle">Alpine.js + Streaming + Markdown</text>
+
+      <!-- Flask API -->
+      <rect x="500" y="110" width="240" height="72" rx="12" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="620" y="140" fill="#6ee7ff" font-size="14" text-anchor="middle" font-weight="700">Flask API Layer</text>
+      <text x="620" y="160" fill="#8a9bc0" font-size="11" text-anchor="middle">50+ auto-registered endpoints</text>
+
+      <!-- Auth / CSRF -->
+      <rect x="820" y="110" width="200" height="72" rx="12" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="920" y="140" fill="#fbbf24" font-size="14" text-anchor="middle" font-weight="700">Auth &amp; Security</text>
+      <text x="920" y="160" fill="#8a9bc0" font-size="11" text-anchor="middle">CSRF, Session, Login, Loopback</text>
+
+      <!-- MCP/A2A -->
+      <rect x="1100" y="110" width="200" height="72" rx="12" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="1200" y="140" fill="#a78bfa" font-size="14" text-anchor="middle" font-weight="700">MCP / A2A</text>
+      <text x="1200" y="160" fill="#8a9bc0" font-size="11" text-anchor="middle">Protocol Servers (ASGI)</text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 2 — Core Orchestrator                -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <!-- Core orchestrator zone -->
+      <rect x="280" y="215" width="680" height="105" rx="16"
+            fill="url(#g-core)" stroke="#4a5f8f" stroke-width="1.5"/>
+      <text x="620" y="248" fill="#e8ecf5" font-size="18" text-anchor="middle" font-weight="800">Agent Zero Orchestrator</text>
+      <text x="620" y="270" fill="#8a9bc0" font-size="12" text-anchor="middle">
+        agent.py — AgentContext + Agent classes — async message loop
+      </text>
+      <text x="620" y="290" fill="#6b7fa6" font-size="11" text-anchor="middle">
+        Prompt assembly | LLM streaming | Tool dispatch | History compression | Intervention handling
+      </text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 3 — Extension System (left side)     -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <!-- Extension zone background -->
+      <rect x="60" y="350" width="290" height="290" rx="14"
+            fill="url(#g-zone-ext)" stroke="#2d5a4a" stroke-dasharray="6 4" stroke-opacity="0.5"/>
+      <text x="80" y="374" fill="#34d399" font-size="11" font-weight="700" letter-spacing="0.8">
+        EXTENSION HOOK SYSTEM (23 categories)
+      </text>
+
+      <rect x="80" y="390" width="250" height="40" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="205" y="415" fill="#34d399" font-size="12" text-anchor="middle" font-weight="600">system_prompt</text>
+
+      <rect x="80" y="438" width="250" height="40" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="205" y="463" fill="#34d399" font-size="12" text-anchor="middle" font-weight="600">message_loop_prompts *</text>
+
+      <rect x="80" y="486" width="250" height="40" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="205" y="511" fill="#34d399" font-size="12" text-anchor="middle" font-weight="600">tool_execute_before / after</text>
+
+      <rect x="80" y="534" width="250" height="40" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="205" y="559" fill="#34d399" font-size="12" text-anchor="middle" font-weight="600">monologue_start / end</text>
+
+      <rect x="80" y="582" width="250" height="40" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="205" y="607" fill="#34d399" font-size="12" text-anchor="middle" font-weight="600">response_stream + secret_mask</text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 3 — Tools (center)                   -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <rect x="370" y="350" width="320" height="290" rx="14"
+            fill="rgba(167,139,250,0.03)" stroke="#3d3a6e" stroke-dasharray="6 4" stroke-opacity="0.5"/>
+      <text x="390" y="374" fill="#a78bfa" font-size="11" font-weight="700" letter-spacing="0.8">
+        TOOLS (python/tools/) — 22 Built-in
+      </text>
+
+      <rect x="390" y="390" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="457" y="413" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">code_execution</text>
+
+      <rect x="535" y="390" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="602" y="413" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">call_subordinate</text>
+
+      <rect x="390" y="434" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="457" y="457" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">memory_save</text>
+
+      <rect x="535" y="434" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="602" y="457" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">memory_load</text>
+
+      <rect x="390" y="478" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="457" y="501" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">browser_agent</text>
+
+      <rect x="535" y="478" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="602" y="501" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">search_engine</text>
+
+      <rect x="390" y="522" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="457" y="545" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">document_query</text>
+
+      <rect x="535" y="522" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="602" y="545" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">vision_load</text>
+
+      <rect x="390" y="566" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="457" y="589" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">scheduler</text>
+
+      <rect x="535" y="566" width="135" height="36" rx="8" fill="url(#g-node)" stroke="#2a3a5c"/>
+      <text x="602" y="589" fill="#a78bfa" font-size="11" text-anchor="middle" font-weight="600">notify_user</text>
+
+      <rect x="390" y="600" width="280" height="28" rx="6" fill="rgba(167,139,250,0.06)" stroke="none"/>
+      <text x="530" y="619" fill="#6b7fa6" font-size="10" text-anchor="middle">
+        + response, input, wait, memory_forget, memory_delete, a2a_chat ...
+      </text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 3 — Right column: Memory + LLM       -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <!-- Memory & Knowledge -->
+      <rect x="710" y="350" width="300" height="140" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="860" y="378" fill="#6ee7ff" font-size="14" text-anchor="middle" font-weight="700">Memory &amp; Knowledge</text>
+      <text x="860" y="400" fill="#8a9bc0" font-size="11" text-anchor="middle">FAISS vector DB + sentence-transformers</text>
+      <text x="860" y="418" fill="#6b7fa6" font-size="11" text-anchor="middle">Semantic search | Auto-consolidation</text>
+      <text x="860" y="436" fill="#6b7fa6" font-size="11" text-anchor="middle">Fragments, solutions, behaviour rules</text>
+      <text x="860" y="458" fill="#8a9bc0" font-size="10" text-anchor="middle">
+        /memory &nbsp; /knowledge &nbsp; /logs
+      </text>
+
+      <!-- LLM Providers -->
+      <rect x="710" y="505" width="300" height="135" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="860" y="533" fill="#a78bfa" font-size="14" text-anchor="middle" font-weight="700">LLM Providers (via LiteLLM)</text>
+      <text x="860" y="555" fill="#8a9bc0" font-size="11" text-anchor="middle">Chat model | Utility model | Embeddings | Browser</text>
+
+      <!-- Provider chips -->
+      <rect x="730" y="568" width="70" height="20" rx="5" fill="rgba(167,139,250,0.12)" stroke="none"/>
+      <text x="765" y="582" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="600">Anthropic</text>
+
+      <rect x="808" y="568" width="58" height="20" rx="5" fill="rgba(167,139,250,0.12)" stroke="none"/>
+      <text x="837" y="582" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="600">OpenAI</text>
+
+      <rect x="874" y="568" width="56" height="20" rx="5" fill="rgba(167,139,250,0.12)" stroke="none"/>
+      <text x="902" y="582" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="600">Google</text>
+
+      <rect x="938" y="568" width="52" height="20" rx="5" fill="rgba(167,139,250,0.12)" stroke="none"/>
+      <text x="964" y="582" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="600">Groq</text>
+
+      <rect x="730" y="594" width="56" height="20" rx="5" fill="rgba(167,139,250,0.08)" stroke="none"/>
+      <text x="758" y="608" fill="#7c8baa" font-size="9" text-anchor="middle">Ollama</text>
+
+      <rect x="794" y="594" width="72" height="20" rx="5" fill="rgba(167,139,250,0.08)" stroke="none"/>
+      <text x="830" y="608" fill="#7c8baa" font-size="9" text-anchor="middle">DeepSeek</text>
+
+      <rect x="874" y="594" width="60" height="20" rx="5" fill="rgba(167,139,250,0.08)" stroke="none"/>
+      <text x="904" y="608" fill="#7c8baa" font-size="9" text-anchor="middle">Mistral</text>
+
+      <rect x="942" y="594" width="48" height="20" rx="5" fill="rgba(167,139,250,0.08)" stroke="none"/>
+      <text x="966" y="608" fill="#7c8baa" font-size="9" text-anchor="middle">+ more</text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 3 — Far right: Prompts + Profiles    -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <rect x="1030" y="350" width="290" height="140" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="1175" y="378" fill="#fbbf24" font-size="14" text-anchor="middle" font-weight="700">Prompt System</text>
+      <text x="1175" y="400" fill="#8a9bc0" font-size="11" text-anchor="middle">Modular Markdown prompt files</text>
+      <text x="1175" y="418" fill="#6b7fa6" font-size="11" text-anchor="middle">agent.system.main.*.md</text>
+      <text x="1175" y="436" fill="#6b7fa6" font-size="11" text-anchor="middle">agent.system.tool.*.md</text>
+      <text x="1175" y="458" fill="#8a9bc0" font-size="10" text-anchor="middle">Placeholder replacement at runtime</text>
+
+      <!-- Agent Profiles -->
+      <rect x="1030" y="505" width="290" height="135" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="1175" y="533" fill="#f472b6" font-size="14" text-anchor="middle" font-weight="700">Agent Profiles</text>
+      <text x="1175" y="555" fill="#8a9bc0" font-size="11" text-anchor="middle">Custom prompts, tools, behaviours per role</text>
+
+      <rect x="1050" y="568" width="66" height="22" rx="6" fill="rgba(244,114,182,0.12)" stroke="none"/>
+      <text x="1083" y="583" fill="#f472b6" font-size="10" text-anchor="middle" font-weight="600">default</text>
+
+      <rect x="1124" y="568" width="76" height="22" rx="6" fill="rgba(244,114,182,0.12)" stroke="none"/>
+      <text x="1162" y="583" fill="#f472b6" font-size="10" text-anchor="middle" font-weight="600">developer</text>
+
+      <rect x="1208" y="568" width="80" height="22" rx="6" fill="rgba(244,114,182,0.12)" stroke="none"/>
+      <text x="1248" y="583" fill="#f472b6" font-size="10" text-anchor="middle" font-weight="600">researcher</text>
+
+      <rect x="1050" y="598" width="66" height="22" rx="6" fill="rgba(244,114,182,0.08)" stroke="none"/>
+      <text x="1083" y="613" fill="#7c8baa" font-size="10" text-anchor="middle">hacker</text>
+
+      <rect x="1124" y="598" width="66" height="22" rx="6" fill="rgba(244,114,182,0.08)" stroke="none"/>
+      <text x="1157" y="613" fill="#7c8baa" font-size="10" text-anchor="middle">agent0</text>
+
+      <rect x="1198" y="598" width="90" height="22" rx="6" fill="rgba(244,114,182,0.08)" stroke="none"/>
+      <text x="1243" y="613" fill="#7c8baa" font-size="10" text-anchor="middle">custom ...</text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 4 — Subordinates & Execution         -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <!-- Subordinate Agents -->
+      <rect x="60" y="670" width="310" height="90" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="215" y="700" fill="#e8ecf5" font-size="14" text-anchor="middle" font-weight="700">Subordinate Agents</text>
+      <text x="215" y="720" fill="#8a9bc0" font-size="11" text-anchor="middle">Recursive hierarchy: Agent N spawns Agent N+1</text>
+      <text x="215" y="738" fill="#6b7fa6" font-size="11" text-anchor="middle">Per-task context, results bubble up</text>
+
+      <!-- Code Execution -->
+      <rect x="390" y="670" width="230" height="90" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="505" y="700" fill="#e8ecf5" font-size="14" text-anchor="middle" font-weight="700">Code Execution</text>
+      <text x="505" y="720" fill="#8a9bc0" font-size="11" text-anchor="middle">Python, Node.js, Shell</text>
+      <text x="505" y="738" fill="#6b7fa6" font-size="11" text-anchor="middle">Local | SSH | Docker sandbox</text>
+
+      <!-- Browser Automation -->
+      <rect x="640" y="670" width="230" height="90" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="755" y="700" fill="#e8ecf5" font-size="14" text-anchor="middle" font-weight="700">Browser Automation</text>
+      <text x="755" y="720" fill="#8a9bc0" font-size="11" text-anchor="middle">browser-use + Playwright</text>
+      <text x="755" y="738" fill="#6b7fa6" font-size="11" text-anchor="middle">Vision-based web interaction</text>
+
+      <!-- External Services -->
+      <rect x="890" y="670" width="230" height="90" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="1005" y="700" fill="#e8ecf5" font-size="14" text-anchor="middle" font-weight="700">External Services</text>
+      <text x="1005" y="720" fill="#8a9bc0" font-size="11" text-anchor="middle">SearXNG, OS, Filesystem, HTTP</text>
+      <text x="1005" y="738" fill="#6b7fa6" font-size="11" text-anchor="middle">Email (IMAP/Exchange), Git</text>
+
+      <!-- Speech/Audio -->
+      <rect x="1140" y="670" width="180" height="90" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="1230" y="700" fill="#e8ecf5" font-size="14" text-anchor="middle" font-weight="700">Speech &amp; Audio</text>
+      <text x="1230" y="720" fill="#8a9bc0" font-size="11" text-anchor="middle">Whisper STT</text>
+      <text x="1230" y="738" fill="#6b7fa6" font-size="11" text-anchor="middle">Kokoro TTS</text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- LAYER 5 — Outputs                          -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <rect x="330" y="790" width="740" height="70" rx="14" fill="url(#g-node)" stroke="#3a4d75"/>
+      <text x="700" y="822" fill="#e8ecf5" font-size="15" text-anchor="middle" font-weight="700">Outputs &amp; Persistence</text>
+      <text x="700" y="842" fill="#8a9bc0" font-size="12" text-anchor="middle">
+        Streamed responses | HTML chat logs | File exports | Memory fragments | Backup/restore
+      </text>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- ARROWS — Data & Control Flow               -->
+      <!-- ═══════════════════════════════════════════ -->
+
+      <!-- User → Flask API -->
+      <line x1="700" y1="62" x2="620" y2="108" stroke="#6ee7ff" stroke-width="1.8" opacity="0.6" marker-end="url(#arr-cyan)"/>
+      <!-- User → Web UI -->
+      <line x1="620" y1="62" x2="350" y2="108" stroke="#6ee7ff" stroke-width="1.8" opacity="0.6" marker-end="url(#arr-cyan)"/>
+
+      <!-- Web UI → Flask -->
+      <line x1="420" y1="146" x2="498" y2="146" stroke="#6ee7ff" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-cyan)"/>
+      <!-- Flask → Auth -->
+      <line x1="740" y1="146" x2="818" y2="146" stroke="#fbbf24" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-cyan)"/>
+      <!-- Flask → MCP/A2A -->
+      <line x1="920" y1="120" x2="1098" y2="130" stroke="#a78bfa" stroke-width="1.5" opacity="0.3" marker-end="url(#arr-purple)"/>
+
+      <!-- Flask → Orchestrator -->
+      <line x1="620" y1="182" x2="620" y2="213" stroke="#6ee7ff" stroke-width="2" opacity="0.6" marker-end="url(#arr-cyan)"/>
+
+      <!-- Orchestrator → Extensions -->
+      <line x1="350" y1="300" x2="205" y2="348" stroke="#34d399" stroke-width="1.8" opacity="0.5" marker-end="url(#arr-green)"/>
+      <!-- Orchestrator → Tools -->
+      <line x1="530" y1="320" x2="530" y2="348" stroke="#a78bfa" stroke-width="1.8" opacity="0.5" marker-end="url(#arr-purple)"/>
+      <!-- Orchestrator → Memory -->
+      <line x1="860" y1="320" x2="860" y2="348" stroke="#6ee7ff" stroke-width="1.8" opacity="0.5" marker-end="url(#arr-cyan)"/>
+      <!-- Orchestrator → Prompts -->
+      <line x1="920" y1="300" x2="1100" y2="348" stroke="#fbbf24" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-cyan)"/>
+      <!-- Orchestrator → LLM -->
+      <line x1="930" y1="310" x2="860" y2="503" stroke="#a78bfa" stroke-width="1.8" opacity="0.4" marker-end="url(#arr-purple)"/>
+
+      <!-- Tools → Subordinates -->
+      <line x1="457" y1="610" x2="300" y2="668" stroke="#a78bfa" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-purple)"/>
+      <!-- Tools → Code Exec -->
+      <line x1="457" y1="626" x2="505" y2="668" stroke="#a78bfa" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-purple)"/>
+      <!-- Tools → Browser -->
+      <line x1="602" y1="514" x2="755" y2="668" stroke="#a78bfa" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-purple)"/>
+      <!-- Tools → External -->
+      <line x1="602" y1="558" x2="950" y2="668" stroke="#a78bfa" stroke-width="1.5" opacity="0.3" marker-end="url(#arr-purple)"/>
+      <!-- Memory → LLM (embedding) -->
+      <line x1="810" y1="490" x2="810" y2="503" stroke="#6ee7ff" stroke-width="1.2" opacity="0.3" marker-end="url(#arr-cyan)"/>
+
+      <!-- Profiles → Orchestrator -->
+      <line x1="1100" y1="560" x2="960" y2="310" stroke="#f472b6" stroke-width="1.2" opacity="0.3" marker-end="url(#arr-pink)"/>
+
+      <!-- Execution layer → Outputs -->
+      <line x1="505" y1="760" x2="600" y2="788" stroke="#6ee7ff" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-cyan)"/>
+      <line x1="755" y1="760" x2="730" y2="788" stroke="#6ee7ff" stroke-width="1.5" opacity="0.4" marker-end="url(#arr-cyan)"/>
+
+    </svg>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- Legend Cards                                -->
+  <!-- ═══════════════════════════════════════════ -->
+
+  <div class="legend">
+    <div class="card">
+      <h3><span class="dot" style="background:#6ee7ff"></span> Entry Points</h3>
+      <p>
+        <code>run_ui.py</code> launches the Flask server, auto-discovers API handlers from
+        <code>python/api/</code>, and mounts MCP/A2A protocol servers as ASGI middleware.
+        The web UI is served from <code>webui/</code> with Alpine.js for reactivity.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#a78bfa"></span> Orchestrator Core</h3>
+      <p>
+        <code>agent.py</code> defines <code>AgentContext</code> (execution container) and <code>Agent</code>
+        (individual agent). The async message loop assembles prompts, calls the LLM via LiteLLM,
+        parses tool invocations, and streams responses in real time.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#34d399"></span> Extension Hooks</h3>
+      <p>
+        23 hook categories in <code>python/extensions/</code> allow injecting logic at every stage:
+        system prompt assembly, message loop, tool execution, response streaming, monologue boundaries,
+        and secret masking. Files execute in alphabetical/numeric order.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#a78bfa"></span> Tools (22 Built-in)</h3>
+      <p>
+        Each tool in <code>python/tools/</code> inherits a base class, receives an <code>args</code> dict,
+        and returns a <code>Response</code>. Key tools: <code>code_execution</code>,
+        <code>call_subordinate</code>, <code>browser_agent</code>, <code>memory_save/load</code>,
+        <code>search_engine</code>, <code>scheduler</code>, <code>document_query</code>.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#6ee7ff"></span> Memory System</h3>
+      <p>
+        Hybrid memory uses FAISS for vector similarity search with sentence-transformers embeddings.
+        Memories are auto-consolidated by an AI utility model to reduce duplication.
+        Stores fragments, solutions, and behaviour rules in <code>/memory</code>.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#f472b6"></span> Agent Profiles</h3>
+      <p>
+        Profiles in <code>agents/</code> (default, developer, researcher, hacker) override prompts,
+        tools, and behaviours per role. Each can have its own <code>prompts/</code> directory
+        and custom system instructions.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#a78bfa"></span> Multi-Provider LLM</h3>
+      <p>
+        Configured in <code>conf/model_providers.yaml</code> and <code>models.py</code>.
+        Supports Anthropic, OpenAI, Google, Groq, Ollama, DeepSeek, Mistral, LM Studio, and more
+        through the LiteLLM abstraction layer. Per-model rate limiting built in.
+      </p>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:#fbbf24"></span> Runtime &amp; Config</h3>
+      <p>
+        <code>.env</code> for API keys, <code>tmp/settings.json</code> for runtime state,
+        <code>initialize.py</code> wires up all models and MCP servers.
+        Supports Docker (sandboxed execution), SSH (remote), or bare-metal deployment.
+      </p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Agent Zero Architecture — Generated from codebase analysis</span>
+    <span>Self-contained HTML &bull; No external dependencies &bull; Edit SVG directly to customize</span>
+  </div>
+
+</body>
+</html>
